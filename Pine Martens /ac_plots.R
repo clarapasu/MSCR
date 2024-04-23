@@ -6,18 +6,18 @@ library(dplyr)
 library(ggplot2)
 library(secr)
 library(sf)
-Rcpp::sourceCpp("/Users/clara/Documents/RProjects/SECR_memory/LikelihoodC.cpp")
-source("/Users/clara/Documents/RProjects/SECR_memory/Sim_Func.R")
-source("/Users/clara/Documents/RProjects/SECR_memory/Fit_Func.R")
+Rcpp::sourceCpp("Functions/LikelihoodC.cpp")
+source("Functions/SECR_memory/Sim_Func.R")
+source("Functions/Fit_Func.R")
 
 
 ## load the final traps and dataset obtained in "Analysis.R"
-traps<-read.csv("/Users/clara/Documents/RProjects/Pine_Martens/Data analysis/pine_marten_traps.csv",row.names=1)
-df<-read.csv("/Users/clara/Documents/RProjects/Pine_Martens/Data analysis/pine_marten_df.csv",row.names=1)
+traps<-read.csv("pine_marten_traps.csv",row.names=1)
+df<-read.csv("pine_marten_df.csv",row.names=1)
 
 #load the models and results from the file "Analysis.R"
-fit <- get(load("/Users/clara/Documents/RProjects/Pine_Martens/Data analysis/memory_model.Rdata")) 
-fit_nomem <- get(load("/Users/clara/Documents/RProjects/Pine_Martens/Data analysis/nomemory_model.Rdata"))
+fit <- get(load("memory_model.Rdata")) 
+fit_nomem <- get(load("nomemory_model.Rdata"))
 theta_est<-fit$par
 theta_est_nm<-fit_nomem$par
 

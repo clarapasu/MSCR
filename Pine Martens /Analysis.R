@@ -6,14 +6,14 @@ library(ggplot2)
 library(tibble)
 library(secr)
 library(sf)
-Rcpp::sourceCpp("/Users/clara/Documents/RProjects/SECR_memory/LikelihoodC.cpp")
-source("/Users/clara/Documents/RProjects/SECR_memory/Sim_Func.R")
-source("/Users/clara/Documents/RProjects/SECR_memory/Fit_Func.R")
+Rcpp::sourceCpp("Functions/LikelihoodC.cpp")
+source("Functions/Sim_Func.R")
+source("Functions/Fit_Func.R")
 
 
 ## load the original data 
-data<-read.csv("/Users/clara/Documents/RProjects/Pine_Martens/Data analysis/pine_martens.csv")
-traps<-read.csv("/Users/clara/Documents/RProjects/Pine_Martens/Data analysis/CameraLocations.csv")
+data<-read.csv("pine_martens.csv")
+traps<-read.csv("CameraLocations.csv")
 
 ## prepare the capture histories and traps data:
 ## - keep only the data from the 2017 field season of the study area number 3. 
