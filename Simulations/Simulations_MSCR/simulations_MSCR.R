@@ -120,18 +120,15 @@ for (j in 1:500){
   param_nomem<-confint_param(fit_nomem,T,trap,meshmat,n)
   N_est_nomem<-confint_pop(fit_nomem,T,traps,mask,n,distribution = "poisson", loginterval = TRUE, alpha = 0.05)
   
-  data_name <- sprintf("df_%02d.csv", k) 
-  write.csv(df_sim,file=data_name)
-  
-  fit_name <- paste("model_", k, ".RData", sep = "")
-  save(fit,file=fit_name)
-  
-  fit_nomem_name <- paste("model_nm_", k, ".RData", sep = "")
-  save(fit_nomem,file=fit_nomem_name)
-  
+  #data_name <- sprintf("df_%02d.csv", k) 
+  #write.csv(df_sim,file=data_name)
+  #fit_name <- paste("model_", k, ".RData", sep = "")
+  #save(fit,file=fit_name)
+  #fit_nomem_name <- paste("model_nm_", k, ".RData", sep = "")
+ # save(fit_nomem,file=fit_nomem_name)
   trap_count<-df_sim %>% 
     group_by(id) %>%
     summarise(y_count = n_distinct(y), na.rm = TRUE)
-  
+
   results_bis[j,]<-c(param$value,param$lower,param$upper,N_est[1],N_est[3:4],param_nomem$value,param_nomem$lower,param_nomem$upper,N_est_nomem[1],N_est_nomem[3:4],n,mean(table(df_sim$id)),mean(trap_count$y_count))
 }
