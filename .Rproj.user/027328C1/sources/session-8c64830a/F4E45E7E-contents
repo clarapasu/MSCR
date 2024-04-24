@@ -66,12 +66,12 @@ trap<-as.matrix(traps)
 theta_init<-c(-1, 0.01, 0)
 T<-12
 fit <- optim(theta_init, LikelihoodC, trap = trap,df = ddfmat, dfrows = dfrows, mesh = meshmat, endt = T, hessian=TRUE)
-confint_param(fit,T,trap,meshmat)
-confint_pop(fit,T,traps,mask,n,distribution = "binomial", loginterval = TRUE, alpha = 0.05)
+confint_param(fit,T,trap,meshmat,n)
+confint_pop(fit,T,traps,mask,n,distribution = "poisson", loginterval = TRUE, alpha = 0.05)
 
 fit_nomem <- optim(theta_init[1:2], LikelihoodCnoMem, trap = trap,df = ddfmat, dfrows = dfrows, mesh = meshmat, endt = T, hessian=TRUE)
-confint_param(fit_nomem,T,trap,meshmat)
-confint_pop(fit_nomem,T,traps,mask,n,distribution = "binomial", loginterval = TRUE, alpha = 0.05)
+confint_param(fit_nomem,T,trap,meshmat,n)
+confint_pop(fit_nomem,T,traps,mask,n,distribution = "poisson", loginterval = TRUE, alpha = 0.05)
 
 
 
@@ -118,17 +118,19 @@ for (j in 1:500){
   elapsed_time <- as.numeric(difftime(end_time, start_time, units = "secs"))
   execution_times <- c(execution_times, elapsed_time)
   
-  param<- confint_param(fit,T,trap,meshmat)
-  N_est<-confint_pop(fit,T,traps,mask,n,distribution = "binomial", loginterval = TRUE, alpha = 0.05)
+  param<- confint_param(fit,T,trap,meshmat,n)
+  N_est<-confint_pop(fit,T,traps,mask,n,distribution = "poisson", loginterval = TRUE, alpha = 0.05)
   
+  print(df)
+  print(fit)
   start_time <- Sys.time()
   fit_nomem <- optim(theta_init[1:2], LikelihoodCnoMem, trap = trap,df = ddfmat, dfrows = dfrows, mesh = meshmat, endt = T, hessian=TRUE)
   end_time <- Sys.time()
   elapsed_time <-as.numeric(difftime(end_time, start_time, units = "secs"))
   execution_times_nm <- c(execution_times_nm, elapsed_time)
   
-  param_nomem<-confint_param(fit_nomem,T,trap,meshmat)
-  N_est_nomem<-confint_pop(fit_nomem,T,traps,mask,n,distribution = "binomial", loginterval = TRUE, alpha = 0.05)
+  param_nomem<-confint_param(fit_nomem,T,trap,meshmat,n)
+  N_est_nomem<-confint_pop(fit_nomem,T,traps,mask,n,distribution = "poisson", loginterval = TRUE, alpha = 0.05)
   
   #data_name <- sprintf("df_%02d.csv", k) 
   #write.csv(df,file=data_name)

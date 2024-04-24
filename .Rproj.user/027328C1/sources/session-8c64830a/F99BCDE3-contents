@@ -1,9 +1,18 @@
+## functions to simulate a dataset from the MSCR model
+## in this file we encounter
+## theta: model parameters, where theta=(h0,sigma,beta)
+## k: coordinates of a trap 
+## s: coordinates of an activity centre
+## m: memory indicator, 1 if we want the model with memory and 0 without
+## z: coordinates of a trap, in practice the one where the individual was last seen at
+## N: total population size
+## ac: vector of N activity centre coordinates
+## trap: vector of all of the trap coordinates
 
 
-# no matrix
+
+## halfnormal distribution
 halfnormal<-function(k, theta, s, logscale = FALSE){
-  # k <- c(kx, ky)
-  # theta<-c(h0,sigma)
   kx <- k[1]
   ky <- k[2]
   h0 <- exp(theta[1])
@@ -13,23 +22,8 @@ halfnormal<-function(k, theta, s, logscale = FALSE){
   return(as.numeric(h))
 }
 
-# # older version
-# halfnormal<-function(k,theta,s){
-#   h0<-exp(theta[1])
-#   sigma<-exp(theta[2])
-#   h<-h0*exp(-t(k-s)%*%(k-s)/(2*sigma))
-#   return(h)
-# }
-
-# Hazard function for a trap at location k at time t.
-# Theta are the parameters, s the individual's activity centre
-# and z the location where it was last observed.
-
-
-# removing matrix ops makes faster
+## hazard function with an OU shape, t represents the time since the last capture 
 hazard<-function(k, theta, t, z, s, m, logscale = FALSE){
-  #theta<-c(h0,sigma,beta)
-  #k<-c(kx,ky)
   kx <- k[1]
   ky <- k[2]
   h0<-exp(theta[1])   
@@ -48,51 +42,28 @@ hazard<-function(k, theta, t, z, s, m, logscale = FALSE){
   return(h)
 }
 
-
-# # older version
-# hazard<-function(k,theta,t,z,s){
-#   h0<-exp(theta[1])
-#   sigma<-exp(theta[2])
-#   beta<--exp(theta[3])
-#   I<-diag(2)
-#   B<-exp(beta*t)*I
-#   Lambda<-sigma*I
-#   mu<-B%*%z+(I-B)%*%s
-#   Sigma<-Lambda-B%*%Lambda%*%B
-#   h<-h0*exp(-(1/2)*t(k-mu)%*%solve(Sigma)%*%(k-mu))
-#   return(h)
-# }
-
-# Total hazard function for an individual with activity centre s
-# last seen at location z. Theta are the parameters and 
-# trap contains the locations of all the traps in the study. 
+## cumulative hazard function
 total_hazard<-function(trap,theta,t,z,s,m){
   h.<-sum(apply(trap,1,hazard,theta=theta,t=t,z=unlist(z),s=unlist(s),m=m))
   return(h.)
 }
 
-# Approximation of the survival function between times t1 and t2 
-# for an individual with activity center s last seen at location z.
-# The parameters are theta and trap contains the locations of 
-# all the traps in the study. 
+## Approximation of the survival function between times t[i] and t[i-1]
+## as a constant, where the last capture occurred at time t[j]
 Survival<-function(trap,theta,t,i,j,z,s,m){
   Surv<-exp(-(t[i]-t[i-1])*total_hazard(trap,theta, t[i-1]-t[j]+((t[i]-t[i-1])/2),z,s,m))
   return(Surv)
 }
 
 
-# Simulates capture times and traps for each of the N individuals (although some will remain unobserved). 
-# ac contains the N activity centres, trap the locations of all the traps in the study and theta the parameters.
-# The study is run from time 0 to T. To simulate the capture times we discretize this time frame in r segments of
-# equal length. 
+## simulation of N capture histories over time [0,T]
+## only returns the capture histories of observed individuals
 sim_data<-function(N,T,r,theta,trap,ac,m){
-
   data<-data.frame(matrix(ncol = 3, nrow = 0))
   names<-c("id","t","y")
   colnames(data)<-names
   time<-seq(0,T,T/r)
   K<-dim(trap)[1]
-
   for (n in 1:N){
     s<-ac[n,]
     y<-c()
@@ -142,30 +113,23 @@ sim_data<-function(N,T,r,theta,trap,ac,m){
     dat<-data.frame(id,Time,y)
     data<-rbind(data,dat)
   }
-  # Now we remove from the dataset the unobserved individuals
   df<-data
-  #i<-1
   for (j in 1:N){
     if (identical(df[df$id==j,]$y,rep(0,length(time)-1))){
       df<-df[!(df$id==j),]
     }
-    #else{
-    #  df[df$id==j,]$id<-i
-    #  i<-i+1
-    #}
   }
   df<-df[!df$y==0,]
   rownames(df) <- NULL
   return(df)
 }
 
+
+## re-number the IDs of the previously simulated dataset starting from 1 
 re_id<-function(df,ac){
-  #record the seen animals activity centers
-  seen_animals<-unique(df$id)
-  seen_ac<-ac[seen_animals,]
-  
-  #re-number the seen animals id's starting from 1 
-  n<-length(unique(df$id)) # number of observed animals
+  #seen_animals<-unique(df$id)
+  #seen_ac<-ac[seen_animals,]
+  n<-length(unique(df$id)) 
   ids<-as.data.frame(table(df$id))
   ids$Var1<-c(1:n)
   ids <- ids[rep(ids$Var1,ids$Freq),1:(ncol(ids)-1)]
@@ -173,11 +137,11 @@ re_id<-function(df,ac){
   return(df)
 }
 
-
-# For simulating from OU process
+## simulation of a trajectory from an OU process
+## theta represents different parameters than previously in this case 
 sim<-function(theta, s,t,T){
-  beta<--exp(theta[2])
-  sigma<-exp(theta[1])^2
+  beta<- -exp(theta[2])
+  sigma<- exp(theta[1])^2
   I<-diag(2)
   start<-mvrnorm(n=1, mu=s,Sigma=sigma*I)
   trk<-data.frame(start[1],start[2])
@@ -185,7 +149,7 @@ sim<-function(theta, s,t,T){
   for (i in 1:T){
     z<-trk[i,]
     mu<-as.double(exp(beta*t)*z+(1-exp(beta*t))*s)
-    Cov<- sigma*I-(1/sigma)*exp(2*beta*t)*I
+    Cov<- sigma*I-(sigma)*exp(2*beta*t)*I
     mvrnorm(n=1, mu=mu,Sigma=Cov)
     bivariate_data <-mvrnorm(n=1, mu=mu,Sigma=Cov)
     trk[nrow(trk) + 1,] = c(bivariate_data[1],bivariate_data[2])
@@ -193,45 +157,29 @@ sim<-function(theta, s,t,T){
   return(trk)
 }
 
-simulate_capthist<-function(theta, N, T, K){
-  traps = make.grid(sqrt(K), sqrt(K), spacex = 1, detector = "multi")
-  s_xy<-runif(2*N, min = -1, max = sqrt(K)+1) # simulate the location of the N activity centers
-  ac<-matrix(s_xy,ncol=2,nrow=N) # place them in a matrix
-  new_row_names <- 1:nrow(traps)
-  rownames(traps) <- new_row_names
-  df<-data.frame(matrix(nrow = 0, ncol = 3))
-  
+
+## function to simulate N capture histories using the previous function to simulate trajectories,
+## a location closer than 50m from a trap is a capture
+simulate_dataOU<-function(T,theta,sim_mesh,N){
+  capthist<-matrix(nrow = 0, ncol = 3)
+  colnames(capthist)<-c("id","Time","y")
+  Random_rows_1<-sample(nrow(sim_mesh),N)
+  ac<-sim_mesh[Random_rows_1,]
+  print(ac) # remove this line 
   for (i in 1:N){
     s<-ac[i,]
-    trk<-sim(theta,s,1,T) # what happens when we change t here?? 
+    trk<-sim(theta,s,0.001,T)
     for (j in 1:T){
       dist<-proxy::dist(as.matrix(traps), trk)[,j]
-      seen<-which(dist<0.1)
-      if (length(seen)!=0){
-        df<-rbind(df,c(i,j,seen))
+      obs<-which(dist<0.05) #change the value here if we want to change the distance to a trap that is a capture
+      if (length(obs)!=0 ){
+        capthist<-rbind(capthist,c(i,j,obs))
       }
     }
   }
-  colnames(df)<-c("id","Time","y")
+  df<-as.data.frame(capthist)
   df<-df%>% mutate(id=dense_rank(id))
-  capt <- data.frame(session = rep("test",each=dim(df)[1]),
-                     ID = df$id,
-                     occasion = ceiling(df$Time),
-                     trapID = as.character(df$y),
-                     stringsAsFactors = FALSE)
-  capthist<-make.capthist(capt,traps)
-  return(capthist)
+  df$Time<-df$Time
+    return(df)
 }
 
-capthist_to_df<-function(capthist){
-  df<-data.frame(matrix(nrow = 0, ncol = 3))
-  for (i in 1: dim(capthist)[1]){
-    var<-which(capthist[i,,]!=0,arr.ind=TRUE)
-    for (j in 1: dim(var)[1]){
-      df<-rbind(df,c(i,var[j,]))
-    }
-  }
-  colnames(df)<-c("id","Time","y")
-  df<-df[order(df$id, df$Time), ]   
-  return(df)
-}
