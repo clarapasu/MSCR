@@ -1,0 +1,8 @@
+"0","trap3 = make.poly(x=traps3$x, y=traps3$y)"
+"1","The boundary of at least one polygon is concave east-west 
+"
+"0","mask3 = make.mask(trap3,buffer=2,spacing=0.2,type=""trapbuffer"")"
+"0","thinmask3<-make.mask(trap3,buffer=2,spacing=0.05,type=""trapbuffer"")"
+"0","thinmeshmat3<-as.matrix(thinmask3)"
+"0","meshmat3<-as.matrix(mask3)"
+"0","plot(meshmat3,)"

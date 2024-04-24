@@ -1,0 +1,355 @@
+---
+title: "Tests"
+author: "Clara Panchaud"
+date: "2024-02-28"
+output: html_document
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(lubridate)
+library(dplyr)
+library(ggplot2)
+library(secr)
+library(sf)
+Rcpp::sourceCpp("/Users/clara/Documents/RProjects/SECR_memory/LikelihoodC.cpp")
+source("/Users/clara/Documents/RProjects/SECR_memory/Sim_Func.R")
+source("/Users/clara/Documents/RProjects/SECR_memory/Fit_Func.R")
+```
+
+
+```{r}
+data<-read.csv("/Users/clara/Documents/RProjects/Pine_Martens/Simulation2/pine_martens.csv")
+traps<-read.csv("/Users/clara/Documents/RProjects/Pine_Martens/Simulation2/CameraLocations.csv")
+```
+We focus on data from the 2017 season, so we only keep this data. 
+We remove the data that has a field season NA (this is data was collected in december 2017 and january 2018) 
+```{r}
+remove<-which(is.na(data$FieldSeason))
+data<-data[-remove,]
+data<-data[data$FieldSeason==2017,]
+data<-data[data$IndividualID!=0,] # remove the unmarked individuals
+remove<-which(is.na(traps$FieldSeason))
+traps<-traps[-remove,]
+traps<-traps[traps$FieldSeason==2017,]
+```
+
+```{r}
+data3<-data[data$StudyAreaID==3,]
+traps3<- subset(traps, StudyAreaID==3)
+```
+
+
+
+```{r}
+
+date_obs<-mdy(gsub("/","-",data3$DefaultStart))
+start_date<-rep(ymd(20170227),length(date_obs))
+day_obs<-as.numeric(date_obs-start_date)
+
+time<-hms(data3$StartTime)
+hours<-hour(time)
+minutes<-minute(time)
+data3$Time<-round(day_obs+(hours*60+minutes)/1440,digits=3)
+```
+
+```{r}
+df3 <- subset(data3, select = c(IndividualID,Time,LocationID))
+traps3<-subset(traps3, select = c(LocationID,UTM_E,UTM_N))
+colnames(df3)<-c("id","Time","y")
+rownames(traps3)<-traps3$LocationID
+traps3<- subset(traps3, select = c(UTM_E,UTM_N))
+colnames(traps3)<-c("x","y")
+
+unique_ids<-unique(df3$id)
+df3$id<-match(df3$id,unique_ids)
+df3<-df3[order(df3$id,df3$Time),]
+
+traps3$x<-traps3$x/1000
+traps3$y<-traps3$y/1000
+
+traps3$name<-rownames(traps3)
+unique_traps<-unique(traps3$name)
+df3$y<-match(df3$y,unique_traps)
+rownames(traps3)<-c(1:30)
+traps3<-subset(traps3, select = c(x,y))
+```
+
+Buffers were tested "by hand" until estimated parameters values were stable. Which was achieved with a buffer of 2. 
+```{r}
+#write.csv(df3,"pine_marten_df.csv")
+#write.csv(traps3,"pine_marten_traps.csv")
+```
+
+
+```{r}
+trap3 = make.poly(x=traps3$x, y=traps3$y)
+mask3 = make.mask(trap3,buffer=2,spacing=0.2,type="trapbuffer")
+thinmask3<-make.mask(trap3,buffer=2,spacing=1,type="trapbuffer")
+thinmeshmat3<-as.matrix(thinmask3)
+meshmat3<-as.matrix(mask3)
+plot(meshmat3,)
+points(trap3,col="red",pch=19)
+
+
+plot(mask3,dots=FALSE,border=0,xlim=c(310,325),ylim=ylim,ppoly=FALSE,asp=1)
+plotMaskEdge(mask3,add=TRUE)
+points(trap3,pch=18)
+title("Study Area")
+legend_label <- "Camera Traps"
+legend("topright", legend = legend_label, pch = 18, col = "black", cex = 0.8, inset = c(0.12,0.12))
+```
+
+
+```{r}
+
+z<-traps3[10,]
+s<-traps3[13,]
+theta_est<-c(0.5,-1.47,-1.03)
+t<-100
+hazard_points<-apply(thinmeshmat3,1,hazard,theta=theta_est,t=t,z=z,s=s,m=1)
+hazard_points<-data.frame(thinmeshmat3[,1],thinmeshmat3[,2],unlist(hazard_points))
+colnames(hazard_points)<-c("x","y","value")
+```
+
+```{r}
+
+g4 <- ggplot(hazard_points, aes(x = x, y = y, fill = value)) +
+  geom_raster(aes(fill = value)) +
+  theme(
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank(),
+    legend.position = "right",
+    legend.text = element_text(size = 10)
+  ) +
+  coord_fixed() +
+  ggtitle("Limiting MCT SCR Hazard function ") +
+  scale_fill_gradient(low = "white", high = "black", name = "Hazard value",limits=c(0,2.5)) +
+  xlim(314, 319) + ylim(4958, 4962)+
+  geom_point(
+    data = data.frame(x = s[1], y = s[2]),
+    aes(x = x, y = y,shape="activity centre"),
+     bg = "white", col = "darkgrey", size = 2
+  ) +
+  guides(shape = guide_legend(title = NULL))
+
+
+```
+
+
+
+```{r}
+
+z<-traps3[10,]
+s<-traps3[13,]
+theta_nm<-c(0.82,-2.27)
+t<-100
+hazard_points_nm<-apply(thinmeshmat3,1,halfnormal,theta=theta_nm,s=s)
+hazard_points_nm<-data.frame(thinmeshmat3[,1],thinmeshmat3[,2],unlist(hazard_points_nm))
+colnames(hazard_points_nm)<-c("x","y","value")
+```
+
+```{r}
+
+g5 <- ggplot(hazard_points_nm, aes(x = x, y = y, fill = value)) +
+  geom_raster(aes(fill = value)) +
+  theme(
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank(),
+    legend.position = "right",
+    legend.text = element_text(size = 10)
+  ) +
+  coord_fixed() +
+  ggtitle("CT SCR Hazard function") +
+  scale_fill_gradient(low = "white", high = "black", name = "Hazard value",limits=c(0,2.5)) +
+  xlim(314, 319) + ylim(4958, 4962) +
+  geom_point(
+    data = data.frame(x = s[1], y = s[2]),
+    aes(x = x, y = y,shape="activity centre"),
+     bg = "white", col = "darkgrey", size = 2
+  ) +
+  guides(shape = guide_legend(title = NULL))
+
+```
+
+
+```{r}
+g4
+g5
+```
+
+
+
+
+```{r}
+traps<-read.csv("/Users/clara/Documents/RProjects/Pine_Martens/Data analysis/pine_marten_traps.csv",row.names=1)
+df<-read.csv("/Users/clara/Documents/RProjects/Pine_Martens/Simulation2/df_03.csv",row.names=1)
+fit <- get(load("/Users/clara/Documents/RProjects/Pine_Martens/Simulation2/model_3.Rdata")) 
+fit_nomem <- get(load("/Users/clara/Documents/RProjects/Pine_Martens/Simulation2/model_nm_3.Rdata"))
+
+theta_est<-fit$par
+theta_est_nm<-fit_nomem$par
+```
+
+
+
+
+```{r}
+space=0.05
+trap_mat<-as.matrix(traps)
+trap_poly = make.poly(x=traps$x, y=traps$y)
+mask = make.mask(trap_poly,buffer=2,spacing=space,type="trapbuffer")
+meshmat<-as.matrix(mask)
+
+```
+
+
+
+```{r}
+
+data<-df[df$id==7,]
+trap_ind<-data.frame( x = trap_poly$x, y = trap_poly$y, seen = rep(0,31),seen_indic=rep(0,31))
+for ( i in 1:length(table(data$y))){
+  trap_ind[as.numeric(names(table(data$y))[i]),]$seen<-table(data$y)[i]
+  trap_ind[as.numeric(names(table(data$y))[i]),]$seen_indic<-1
+}
+
+data<-discretize(data,12,10)
+ac_posterior_ind7<-apply(meshmat,1,Likelihood_ind,theta=theta_est,trap=trap_poly,data=data,memory=1)
+integral7<-as.double(exp(Likelihood_integrate(theta_est,trap_poly,data,mask,1)))
+
+ac_density_ind7<-data.frame(meshmat[,1],meshmat[,2],unlist(ac_posterior_ind7)/integral7)
+colnames(ac_density_ind7)<-c("x","y","value")
+
+
+
+plot_ind3<- ggplot(ac_density_ind7, aes(x = x, y = y, fill = value) ) +   
+  geom_raster() +
+  coord_fixed() +
+  xlim(c(314,320))+
+  ylim(c(4965,4970))+
+  scale_fill_gradient(low = "white", high = "black", name = "AC PDF",limits=c(0,100)) +
+  scale_color_grey(name = "") + 
+  ggtitle("") +
+  geom_point(data = trap_ind, aes(x = x, y = y,size=as.factor(seen)), shape=23,fill = ifelse(trap_ind$seen == 0, fill_seen_zero, "grey"), color="black", inherit.aes = FALSE)+
+  labs(fill = "Hazard value", size= "Number of captures",) +
+  geom_point(data = data.frame(xaxis =  317.3144, yaxis =4967.485), aes(x = xaxis, y = yaxis,color="activity centre") ,size=4,inherit.aes = FALSE)+
+  scale_size_discrete(range = c(5, 10))
+plot_ind3
+
+
+```
+
+
+
+
+```{r}
+data<-df[df$id==7,]
+seen_traps_ind<-matrix(trap_mat[sort(unique(data$y)),],ncol=2)
+times_seen_ind<-as.vector(table(data$y))
+
+data<-discretize(data,12,100)
+ac_posterior_ind_nm7<-apply(meshmat,1,Likelihood_ind,theta=theta_est_nm,trap=trap_poly,data=data,memory=0)
+integral_nm7<-as.double(exp(Likelihood_integrate(theta_est_nm,trap_poly,data,mask,0)))
+
+ac_density_ind_nm7<-data.frame(meshmat[,1],meshmat[,2],unlist(ac_posterior_ind_nm7)/integral_nm7)
+colnames(ac_density_ind_nm7)<-c("x","y","value")
+
+ac_density_ind_nm7$scaled_value <- (ac_density_ind_nm7$value - min(ac_density_ind_nm7$value)) / (max(ac_density_ind_nm7$value) - min(ac_density_ind_nm7$value))*100
+
+
+plot_ind4<- ggplot(ac_density_ind_nm7, aes(x = x, y = y, fill = scaled_value) ) +   
+  geom_raster() +
+  coord_fixed() +
+  xlim(c(314,320))+
+  ylim(c(4965,4970))+
+  scale_fill_gradient(low = "white", high = "black", name = "AC PDF",limits=c(0,100)) + 
+  scale_color_grey(name = "") + 
+  ggtitle("") +
+  geom_point(data = trap_ind, aes(x = x, y = y,size=as.factor(seen)), shape=23,fill = ifelse(trap_ind$seen == 0, fill_seen_zero, "grey"), color="black", inherit.aes = FALSE)+
+  labs(fill = "Hazard value", size= "Number of captures",) +
+  geom_point(data = data.frame(xaxis =  317.3144, yaxis =4967.485), aes(x = xaxis, y = yaxis,color="activity centre") ,size=4,inherit.aes = FALSE)+
+  scale_size_discrete(range = c(5, 10))
+plot_ind4
+
+
+```
+
+
+            x        y
+28962 315.8644 4961.635
+14802 315.7144 4956.685
+40223 314.0644 4965.585
+30151 318.1144 4962.035
+48252 315.1144 4968.385
+8626  314.3644 4954.535
+46949 314.3144 4967.935
+43554 316.1644 4966.735
+13681 316.8644 4956.285
+22293 318.4644 4959.285
+35945 314.6644 4964.085
+31517 314.9144 4962.535
+45722 317.3144 4967.485
+28371 314.9144 4961.435
+36792 314.1144 4964.385
+
+
+33097 315.2644 4963.085
+26447 318.8144 4960.735
+28574 317.9144 4961.485
+29188 312.8644 4961.735
+33352 313.7144 4963.185
+df
+```{r}
+data<-df[df$id==9,]
+trap_ind<-data.frame( x = trap_poly$x, y = trap_poly$y, seen = rep(0,31),seen_indic=rep(0,31))
+for ( i in 1:length(table(data$y))){
+  trap_ind[as.numeric(names(table(data$y))[i]),]$seen<-table(data$y)[i]
+  trap_ind[as.numeric(names(table(data$y))[i]),]$seen_indic<-1
+}
+
+data<-discretize(data,12,10)
+ac_posterior_ind7<-apply(meshmat,1,Likelihood_ind,theta=theta_est,trap=trap_poly,data=data,memory=1)
+integral7<-as.double(exp(Likelihood_integrate(theta_est,trap_poly,data,mask,1)))
+
+ac_density_ind7<-data.frame(meshmat[,1],meshmat[,2],unlist(ac_posterior_ind7)/integral7)
+colnames(ac_density_ind7)<-c("x","y","value")
+
+plot_ind8<- ggplot(ac_density_ind7, aes(x = x, y = y, fill = value) ) +   
+  geom_raster() +
+  coord_fixed() +
+  scale_fill_gradient(low = "white", high = "black", name = "AC PDF",limits=c(0,100)) +
+  scale_color_grey(name = "") + 
+  ggtitle("") +
+  xlim(c(312,317))+
+  ylim(c(4959,4966))+
+  geom_point(data = trap_ind, aes(x = x, y = y,size=as.factor(seen)), shape=23,fill = ifelse(trap_ind$seen == 0, fill_seen_zero, "grey"), color="black", inherit.aes = FALSE)+
+  labs(fill = "Hazard value", size= "Number of captures",) +
+  geom_point(data = data.frame(xaxis =   315.2644, yaxis = 4963.085), aes(x = xaxis, y = yaxis,color="activity centre") ,size=4,inherit.aes = FALSE)+
+  scale_size_discrete(range = c(5, 10))
+plot_ind8
+```
+```{r}
+
+ac_posterior_ind8_nm<-apply(meshmat,1,Likelihood_ind,theta=theta_est_nm,trap=trap_poly,data=data,memory=0)
+integral8_nm<-as.double(exp(Likelihood_integrate(theta_est,trap_poly,data,mask,0)))
+
+ac_density_ind8_nm<-data.frame(meshmat[,1],meshmat[,2],unlist(ac_posterior_ind8_nm)/integral8_nm)
+colnames(ac_density_ind8_nm)<-c("x","y","value")
+
+plot_ind8<- ggplot(ac_density_ind8_nm, aes(x = x, y = y, fill = value) ) +   
+  geom_raster() +
+  coord_fixed() +
+  scale_fill_gradient(low = "white", high = "black", name = "AC PDF",limits=c(0,100)) +
+  scale_color_grey(name = "") + 
+  ggtitle("") +
+  xlim(c(312,317))+
+  ylim(c(4959,4966))+
+  geom_point(data = trap_ind, aes(x = x, y = y,size=as.factor(seen)), shape=23,fill = ifelse(trap_ind$seen == 0, fill_seen_zero, "grey"), color="black", inherit.aes = FALSE)+
+  labs(fill = "Hazard value", size= "Number of captures",) +
+  geom_point(data = data.frame(xaxis =   315.2644, yaxis = 4963.085), aes(x = xaxis, y = yaxis,color="activity centre") ,size=4,inherit.aes = FALSE)+
+  scale_size_discrete(range = c(5, 10))
+plot_ind8
+
+```

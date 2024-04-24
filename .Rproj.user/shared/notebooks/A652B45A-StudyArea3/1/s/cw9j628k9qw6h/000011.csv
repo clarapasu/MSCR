@@ -1,0 +1,2 @@
+"0","data<-read.csv(""/Users/clara/Documents/RProjects/Pine_Martens/Data analysis/pine_martens.csv"")"
+"0","traps<-read.csv(""/Users/clara/Documents/RProjects/Pine_Martens/Data analysis/CameraLocations.csv"")"

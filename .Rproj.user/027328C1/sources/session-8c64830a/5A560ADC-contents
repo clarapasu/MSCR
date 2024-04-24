@@ -1,0 +1,298 @@
+---
+title: "Simulations"
+author: "Clara Panchaud"
+date: "2023-11-20"
+output: html_document
+---
+
+```{r}
+
+library(proxy)
+library(fdrtool)
+library(secr)
+library(dplyr)
+library(ggpubr)
+library(ggplot2)
+library(MASS)
+library(numDeriv)
+Rcpp::sourceCpp("/Users/clara/Documents/RProjects/SECR_memory/LikelihoodC.cpp")
+source("/Users/clara/Documents/RProjects/SECR_memory/Sim_Func.R")
+source("/Users/clara/Documents/RProjects/SECR_memory/Fit_Func.R")
+#set.seed(1)
+```
+
+
+```{r}
+data<-read.csv("pine_martens.csv")
+traps<-read.csv("CameraLocations.csv")
+
+remove<-which(is.na(data$FieldSeason))
+data<-data[-remove,]
+data<-data[data$FieldSeason==2017,]
+data<-data[data$IndividualID!=0,] # remove the unmarked individuals
+remove<-which(is.na(traps$FieldSeason))
+traps<-traps[-remove,]
+traps<-traps[traps$FieldSeason==2017,]
+
+traps<- subset(traps, StudyAreaID==3)
+
+
+traps<-subset(traps, select = c(LocationID,UTM_E,UTM_N))
+rownames(traps)<-traps$LocationID
+traps<- subset(traps, select = c(UTM_E,UTM_N))
+colnames(traps)<-c("x","y")
+
+traps$x<-traps$x/1000
+traps$y<-traps$y/1000
+
+trap = make.poly(x=traps$x, y=traps$y)
+mask = make.mask(trap,buffer=2,spacing=0.3,type="trapbuffer")
+meshmat<-as.matrix(mask)
+plot(meshmat,)
+points(trap,col="red",pch=19)
+K<-30
+T<-12
+N<-20
+```
+
+
+
+```{r}
+sim<-function(theta, s,t,T){
+  beta<- -exp(theta[2])
+  sigma<- exp(theta[1])^2
+  I<-diag(2)
+  start<-mvrnorm(n=1, mu=s,Sigma=sigma*I)
+  trk<-data.frame(start[1],start[2])
+  names(trk)<-c("x","y")
+  for (i in 1:T){
+    z<-trk[i,]
+    mu<-as.double(exp(beta*t)*z+(1-exp(beta*t))*s)
+    Cov<- sigma*I-(sigma)*exp(2*beta*t)*I
+    mvrnorm(n=1, mu=mu,Sigma=Cov)
+    bivariate_data <-mvrnorm(n=1, mu=mu,Sigma=Cov)
+    trk[nrow(trk) + 1,] = c(bivariate_data[1],bivariate_data[2])
+  }
+  return(trk)
+}
+```
+
+With the current units we have that 0.001 units is 1m. And one step is 10 minutes. From internet it should move about 0.1km in 10 minutes. So 100m right? 
+So it can move 0.1 units between two observations. 
+
+
+
+```{r}
+sim_mask<-make.mask(traps,buffer=2,spacing=0.05,type="trapbuffer")
+sim_mesh<-as.matrix(sim_mask)
+Random_rows_1<-sample(nrow(sim_mesh),N)
+ac<-sim_mesh[Random_rows_1,]
+sigma<- 0.2
+beta<- 0.3
+theta<-c(sigma,beta)
+s<-ac[2,]
+trk<-sim(theta,s,0.001,12*24*6) #12*24*6
+ggplot(data=trk,aes(x=x,y=y))+geom_point()+geom_path()+geom_point(data=trap,col="red")+geom_point(aes(x=s[1],y=s[2]),col="green")
+
+trk
+```
+
+A camera can see at a distance of about 10meters let's say. It's not in all directions though but for now maybe we say that for simplicity.  (10 / 1000)
+
+
+```{r}
+simulate_data<-function(T,theta,sim_mesh,N){
+  capthist<-matrix(nrow = 0, ncol = 3)
+  colnames(capthist)<-c("id","Time","y")
+  
+  Random_rows_1<-sample(nrow(sim_mesh),N)
+  ac<-sim_mesh[Random_rows_1,]
+  print(ac) # remove this line 
+  for (i in 1:N){
+    s<-ac[i,]
+    trk<-sim(theta,s,0.001,T)
+    
+    for (j in 1:T){
+      dist<-proxy::dist(as.matrix(traps), trk)[,j]
+      obs<-which(dist<0.05)
+      if (length(obs)!=0 ){
+        capthist<-rbind(capthist,c(i,j,obs))
+      }
+    }
+  }
+  df<-as.data.frame(capthist)
+  df<-df%>% mutate(id=dense_rank(id))
+  df$Time<-df$Time/
+  return(df)
+}
+#We have simulated 100 steps but each step can be a minute apart if we decide so. Maybe for now one step is one hour?
+```
+
+
+
+```{r}
+N<-100
+sim_mask<-make.mask(traps,buffer=2,spacing=0.05,type="trapbuffer")
+sim_mesh<-as.matrix(sim_mask)
+  
+t<-12*24*6
+
+#12*24
+#sigma<- 0.15
+#beta<- 0.5 # the larger the beta the closer to secr 
+theta<-c(sigma,beta)
+
+df<-simulate_data(t,theta,sim_mesh,N)
+n<-length(unique(df$id)) # number of observed individuals
+df$Time<-df$Time/(24*6)
+df
+#time_diff <- c(0, diff(df$Time))
+#index_to_remove <- abs(time_diff[-1]) < 0.04166667
+#thinned_df<-df[!index_to_remove, ]
+#df<-thinned_df
+#thinned_df
+
+```
+
+
+
+
+
+
+```{r}
+r<-10
+ddf <- data.frame(t = as.numeric(), y = as.integer(), id = as.integer())
+for(i in unique(df$id)){
+  data <- discretize(df[df$id == i, ],T, r)
+  data$id <- i
+  ddf <- rbind(ddf, data)
+}
+rm(data) # ???? 
+ddfmat = as.matrix(ddf)
+dfrows = as.numeric(table(ddf$id))
+trap<-as.matrix(traps)
+```
+
+
+```{r}
+LikelihoodC(theta,trap,ddfmat,dfrows,meshmat,T)
+n<-length(unique(df$id))
+
+theta<-c(-1, 0.01, 0)
+T<-12
+#n = 77
+fit <- optim(theta, LikelihoodC, trap = trap,df = ddfmat, dfrows = dfrows, mesh = meshmat, endt = T, hessian=TRUE)
+confint_param(fit,T,trap,meshmat,n)
+confint_pop(fit,T,traps,mask,n,distribution = "poisson", loginterval = TRUE, alpha = 0.05)
+
+fit_nomem <- optim(theta[1:2], LikelihoodCnoMem, trap = trap,df = ddfmat, dfrows = dfrows, mesh = meshmat, endt = T, hessian=TRUE)
+confint_param(fit_nomem,T,trap,meshmat,n)
+confint_pop(fit_nomem,T,traps,mask,n,distribution = "poisson", loginterval = TRUE, alpha = 0.05)
+```
+
+
+```{r}
+set.seed(1)
+results<-data.frame(matrix(ncol = 22, nrow = 100))
+
+sim_mask<-make.mask(traps,buffer=1,spacing=0.05,type="trapbuffer")
+sim_mesh<-as.matrix(sim_mask)
+N<-100
+t<-12*24*6 # one step per hour 
+T<-12
+sigma<- 0.2
+beta<- 0.3 # the larger the beta the closer to secr 
+theta<-c(sigma,beta)
+theta_init<-c(2, -2, 1.5)
+poly_trap = make.poly(x=traps$x, y=traps$y)
+mask = make.mask(poly_trap,buffer=1,spacing=0.3,type="trapbuffer")
+meshmat<-as.matrix(mask)
+trap<-as.matrix(traps)
+r<-10 #number of bins in time discretisation for fitting
+execution_times <- numeric()
+execution_times_nm <- numeric()
+
+for (j in 1:400){
+  k<-100+j
+  df<-simulate_data(t,theta,sim_mesh,N)
+  df$Time<-df$Time/(24*6)
+  n<-length(unique(df$id)) # number of observed individuals
+  ddf <- data.frame(t = as.numeric(), y = as.integer(), id = as.integer())
+  for(i in unique(df$id)){
+    data <- discretize(df[df$id == i, ],T, r)
+    data$id <- i
+    ddf <- rbind(ddf, data)
+    }
+  rm(data) # ???? 
+  ddfmat = as.matrix(ddf)
+  dfrows = as.numeric(table(ddf$id))
+
+  start_time <- Sys.time()
+  fit <- optim(theta_init, LikelihoodC, trap = trap,df = ddfmat, dfrows = dfrows, mesh = meshmat, endt = T, hessian=TRUE)
+  end_time <- Sys.time()
+  elapsed_time <- as.numeric(difftime(end_time, start_time, units = "secs"))
+  execution_times <- c(execution_times, elapsed_time)
+
+  param<- confint_param(fit,T,trap,meshmat,n)
+  N_est<-confint_pop(fit,T,traps,mask,n,distribution = "poisson", loginterval = TRUE, alpha = 0.05)
+  
+   print(df)
+  print(fit)
+  start_time <- Sys.time()
+  fit_nomem <- optim(theta_init[1:2], LikelihoodCnoMem, trap = trap,df = ddfmat, dfrows = dfrows, mesh = meshmat, endt = T, hessian=TRUE)
+  end_time <- Sys.time()
+  elapsed_time <-as.numeric(difftime(end_time, start_time, units = "secs"))
+  execution_times_nm <- c(execution_times_nm, elapsed_time)
+  
+  param_nomem<-confint_param(fit_nomem,T,trap,meshmat,n)
+  N_est_nomem<-confint_pop(fit_nomem,T,traps,mask,n,distribution = "poisson", loginterval = TRUE, alpha = 0.05)
+  
+
+  #data_name <- sprintf("df_%02d.csv", k) 
+  #write.csv(df,file=data_name)
+  
+  #fit_name <- paste("model_", k, ".RData", sep = "")
+  #save(fit,file=fit_name)
+  
+  #fit_nomem_name <- paste("model_nm_", k, ".RData", sep = "")
+  #save(fit_nomem,file=fit_nomem_name)
+  
+  #results[j,]<-c(param$value,param$lower,param$upper,N_est[1],N_est[3:4],param_nomem$value,param_nomem$lower,param_nomem$upper,N_est_nomem[1],N_est_nomem[3:4],n)
+}
+
+results
+
+write.csv(results,"sim_results2.csv")
+write.csv(execution_times, file = "execution_times2.csv")
+write.csv(execution_times_nm, file = "execution_times_nm2.csv")
+
+```
+
+
+```{r}
+2
+```
+
+
+```{r}
+mean(results$X19)
+sqrt(sum((results$X19-100)^2)/100)
+```
+
+```{r}
+results<-read.csv("sim_results.csv")
+results
+
+
+df<-read.csv("df_01.csv")
+
+trap_count<-df%>% 
+  group_by(id) %>%
+  summarise(y_count = n_distinct(y), na.rm = TRUE)
+  
+mean(table(df$id))
+mean(trap_count$y_count)
+```
+
+
+
