@@ -1,3 +1,4 @@
+// Similar functions as in Fit_Func.R but coded in C++ to increase the speed of the computations
 #include <Rcpp.h>
 using namespace Rcpp;
 
@@ -33,7 +34,6 @@ double halfnormalC (
   return hn;
 }
 
-// [[Rcpp::export]]
 double LikelihoodC(
     NumericVector theta,
     NumericMatrix trap,
@@ -47,8 +47,7 @@ double LikelihoodC(
   int D = mesh.nrow();
   
   int nT = trap.nrow();
-  
-  // Rprintf( "value of A is %f", D);
+
   
   double S;
   double U;
@@ -69,7 +68,6 @@ double LikelihoodC(
   LS = log(S);
   
   LL = 0;
-  // sums log-likelihood over individuals
   
   int data_startrow;
   int data_endrow;
@@ -89,9 +87,6 @@ double LikelihoodC(
     t = data(_, 0);
     y = data(_, 1);
     
-    // Rprintf( "LL is %f \n", LL);
-    // %f = double, %i = signed integer, %u = unsigned integer
-    
     int seen_ind;
     double z0;
     double z1;
@@ -110,8 +105,7 @@ double LikelihoodC(
       row_ind += 1;
       fcy = y[row_ind];
     }
-    
-    // sums up likelihood over possible AC locations (integrating out latent ACs)
+
     L = 0;
     for (int j = 0; j < D; j++) {
       
@@ -120,8 +114,8 @@ double LikelihoodC(
       
       capt_time = t[row_ind]; 
       
-      k0 = trap(fcy - 1, 0); // -1 for 0 indexing
-      k1 = trap(fcy - 1, 1); // -1 for 0 indexing
+      k0 = trap(fcy - 1, 0);
+      k1 = trap(fcy - 1, 1); 
       
       Lj = exp(-(capt_time * start_hazards[j])) * halfnormalC(k0, k1, theta, s0, s1);
       seen_ind = row_ind;
@@ -134,7 +128,6 @@ double LikelihoodC(
         total_hazard = 0;
         
         for (int jj = 0; jj < nT; jj++) {
-          // total_hazard += hazardC(trap(jj, 0), trap(jj, 1), theta, 0.5 * (t[i] - t[i-1]), z0, z1, s0, s1);
           total_hazard += hazardC(trap(jj, 0), trap(jj, 1), theta, t[i-1] - t[seen_ind] + 0.5 * (t[i] - t[i-1]), z0, z1, s0, s1);
         }
         survival = exp(-(t[i]-t[i-1]) * total_hazard);
@@ -142,8 +135,8 @@ double LikelihoodC(
         Lj *= survival;
         
         if (y[i] > 0.5){
-          k0 = trap(y[i]-1, 0); // -1 for 0 indexing
-          k1 = trap(y[i]-1, 1); // -1 for 0 indexing
+          k0 = trap(y[i]-1, 0); 
+          k1 = trap(y[i]-1, 1); 
           Lj *= hazardC(k0, k1, theta, (t[i] - capt_time), z0, z1, s0, s1);
           z0 = k0;
           z1 = k1;
@@ -166,7 +159,6 @@ double LikelihoodC(
   return -LL;
 }
 
-//  No memory equivalents
 
 double hazardCnoMem (
     double k0,
@@ -187,7 +179,7 @@ double hazardCnoMem (
   return hz;
 }
 
-// [[Rcpp::export]]
+
 double LikelihoodCnoMem(
     NumericVector theta,
     NumericMatrix trap,
@@ -203,8 +195,6 @@ double LikelihoodCnoMem(
   int D = mesh.nrow();
   
   int nT = trap.nrow();
-  
-  // Rprintf( "value of A is %f", D);
   
   double S;
   double U;
@@ -225,7 +215,6 @@ double LikelihoodCnoMem(
   LS = log(S * a/A);
   
   LL = 0;
-  // sums log-likelihood over individuals
   
   int data_startrow;
   int data_endrow;
@@ -244,10 +233,7 @@ double LikelihoodCnoMem(
     m = data.nrow();
     t = data(_, 0);
     y = data(_, 1);
-    
-    // Rprintf( "LL is %f \n", LL);
-    // %f = double, %i = signed integer, %u = unsigned integer
-    
+
     int seen_ind;
     double z0;
     double z1;
@@ -267,7 +253,6 @@ double LikelihoodCnoMem(
       fcy = y[row_ind];
     }
     
-    // sums up likelihood over possible AC locations (integrating out latent ACs)
     L = 0;
     for (int j = 0; j < D; j++) {
       
@@ -276,8 +261,8 @@ double LikelihoodCnoMem(
       
       capt_time = t[row_ind]; 
       
-      k0 = trap(fcy - 1, 0); // -1 for 0 indexing
-      k1 = trap(fcy - 1, 1); // -1 for 0 indexing
+      k0 = trap(fcy - 1, 0); 
+      k1 = trap(fcy - 1, 1); 
       
       Lj = exp(-(capt_time * start_hazards[j])) * halfnormalC(k0, k1, theta, s0, s1);
       seen_ind = row_ind;
@@ -290,7 +275,6 @@ double LikelihoodCnoMem(
         total_hazard = 0;
         
         for (int jj = 0; jj < nT; jj++) {
-          // total_hazard += hazardCnoMem(trap(jj, 0), trap(jj, 1), theta, 0.5 * (t[i] - t[i-1]), z0, z1, s0, s1);
           total_hazard += hazardCnoMem(trap(jj, 0), trap(jj, 1), theta, t[i-1] - t[seen_ind] + 0.5 * (t[i] - t[i-1]), z0, z1, s0, s1);
         }
         survival = exp(-(t[i]-t[i-1]) * total_hazard);
@@ -298,8 +282,8 @@ double LikelihoodCnoMem(
         Lj *= survival;
         
         if (y[i] > 0.5){
-          k0 = trap(y[i]-1, 0); // -1 for 0 indexing
-          k1 = trap(y[i]-1, 1); // -1 for 0 indexing
+          k0 = trap(y[i]-1, 0); 
+          k1 = trap(y[i]-1, 1); 
           Lj *= hazardCnoMem(k0, k1, theta, (t[i] - capt_time), z0, z1, s0, s1);
           z0 = k0;
           z1 = k1;
@@ -321,14 +305,3 @@ double LikelihoodCnoMem(
   LL = LL - n * LS;
   return -LL;
 }
-
-
-
-// You can include R code blocks in C++ files processed with sourceCpp
-// (useful for testing and development). The R code will be automatically 
-// run after the compilation.
-//
-
-// /*** R
-// LikelihoodC(theta = c(0.5,-0.5,1), trap = trap, df = alldata, mesh = meshmat, endt = 1, r = 10)
-// */
