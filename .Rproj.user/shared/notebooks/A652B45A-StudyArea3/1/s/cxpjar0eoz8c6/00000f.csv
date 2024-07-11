@@ -1,7 +1,0 @@
-"0","theta<-c(1.5,-2,1.2) # h0, sigma, beta"
-"0","traps3<-as.matrix(traps3)"
-"0","LikelihoodC(theta = theta, trap = traps3, df = ddfmat3, dfrows = dfrows3, mesh = meshmat3, endt = T)"
-"1","[1]"
-"1"," 134.2212"
-"1","
-"

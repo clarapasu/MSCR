@@ -1,5 +1,0 @@
-"0","remove<-which(is.na(data$FieldSeason))"
-"0","data<-data[-remove,]"
-"0","data<-data[data$FieldSeason==2017,] "
-"0","data<-data[data$IndividualID!=0,] # remove the unmarked individuals"
-"0","data"

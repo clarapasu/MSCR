@@ -1,2 +1,0 @@
-"0","legend_label <- ""Camera Traps"""
-"0","legend(""topright"", legend = legend_label, pch = 18, col = ""black"", cex = 0.8, inset = c(0.12,0.12))"
