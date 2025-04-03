@@ -8,7 +8,6 @@
 #' @param N: Total population size
 #' @param ac Matrix of dimension Nx2, containing the activity center coordinates for the N individuals.
 #' @param trap Matrix of all of the camera trap coordinates. 
-#' 
 
 
 
