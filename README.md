@@ -3,6 +3,6 @@ Code used to generate the results in "Incorporating Memory into Continuous-Time 
 
 The folder "Functions" contains all of the functions to define both the standard continous-time SCR model and the extended memory MSCR version. 
 
-The folder "Simulations" contains the code used to produce the Simulation Study of the paper. 
+The file "Simulations.R" contains the code used to produce the Simulation Study of the paper. 
 
 The folder "American Martens" contains data from an American martens study, the analysis of this data set by both models and a file that plots the AC PDFs.
