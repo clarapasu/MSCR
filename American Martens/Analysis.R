@@ -24,18 +24,21 @@ traps<-read.csv("marten_traps.csv")
 ## create the mask over the region; different buffers were tested 
 ## until the estimated parameters remained stable
 trap = make.poly(x=traps$x, y=traps$y)
+trap <- trap[-31,]
 mask = make.mask(trap,buffer=2,spacing=0.2,type="trapbuffer")
 meshmat<-as.matrix(mask)
 traps<-as.matrix(traps)
 
 
 
+## to produce Figure 1 of the paper run the following code
+# mask_plot = make.mask(trap, buffer = 2, spacing = 0.01, type = "trapbuffer")
+# plot(mask_plot, dots = FALSE, border = 1, ppoly = FALSE, asp = 1, 
+#     xlab = "Longitude", ylab = "Latitude", main = "Study Area")
+# plotMaskEdge(mask_plot, add = TRUE, col = "black", lwd = 1.5) 
+# points(trap, pch = 4, col = "black", cex = 1.5)
+# title(main = "Study Area with Trap Locations", col.main = "black", font.main = 2, cex.main = 1.5)
 
-## produce Figure 1 of the paper
-plot(mask,dots=FALSE,border=0,xlim=c(310,325),ylim=ylim,ppoly=FALSE,asp=1)
-plotMaskEdge(mask,add=TRUE)
-points(trap,pch=4)
-title("Study Area")
 
 ## set the length of the survey as T=12 days, the time 
 ## discretization with L=100 time intervals, the 
@@ -55,7 +58,7 @@ ddfmat = as.matrix(ddf)
 dfrows = as.numeric(table(ddf$id))
 
 ## inital parameters for MSCR (h0,sigma,beta)
-theta<-c(1.5, 0.5 ,2) 
+theta<-c(1.5, -2 ,1.5) 
 
 
 ## fit the MSCR model and save the running time 
@@ -68,8 +71,6 @@ fit_time<-end_time - start_time
 theta_est<-fit$par
 param<-confint_param(fit,T,traps,mask)
 N_est<-confint_pop(fit,T,traps,mask,n,distribution = "binomial", loginterval = TRUE, alpha = 0.05)
-N_est
-
 
 ## initial parameters for SCR (h0,sigma)
 theta<-c(1.5,-2) 
@@ -78,15 +79,11 @@ theta<-c(1.5,-2)
 start_time <- Sys.time()
 fit_nomem <- optim(theta, LikelihoodCnoMem, trap = traps, df = ddfmat, dfrows = dfrows, mesh = meshmat, endt = T,hessian=TRUE) 
 fit_time_nomem<-end_time <- Sys.time()
-end_time - start_time
-
+time_nomem<- end_time - start_time
 ## extract the estimated parameters and confidence intervals
 param_nm<-confint_param(fit_nomem,T,traps,mask)
 N_nm<-confint_pop(fit_nomem,T,traps,mask,n,distribution = "binomial", loginterval = TRUE, alpha = 0.05)
 
-
 ## calculate the difference in AIC
 theta_est_nomem<-fit_nomem$par
 (2*fit_nomem$value-2*2)-(2*fit$value - 2*3)
-
-
