@@ -1,6 +1,5 @@
 ## Simulation Study 
 
-
 require(secr)
 library(ggplot2)
 library(numDeriv)
@@ -13,6 +12,7 @@ library(fdrtool)
 library(ggpubr)
 library(MASS)
 library(tidyr)
+library(TMB)
 
 
 Rcpp::sourceCpp("Functions/LikelihoodC.cpp")
@@ -23,7 +23,7 @@ source("Functions/Fit_Func.R")
 set.seed(1)
 
 ## load the traps
-traps<-read.csv("marten_traps.csv",col.names = c("x","y"))
+traps<-read.csv("American Martens/marten_traps.csv",col.names = c("x","y"))
 trap = make.poly(x=traps$x, y=traps$y)
 trap <- trap[-31,]
 cams<- read.traps(data = traps,detector="count")
@@ -37,12 +37,12 @@ cams<- read.traps(data = traps,detector="count")
 ## the different values of the parameter beta that we will test,
 ## and the initial parameter values
 
-T<-12
+T<-11
 N<-20
-r<-1000 
+r<-20 
 m<-1 
-h0<- 0.85
-sigma<- -1.16
+h0<- 0.82
+sigma<- -1.14
 beta<- c(-1.5,-1,-0.5,0,0.5,1,1.5)
 K <- 30
 theta_init<- c(1.00,  0.01 , 0.00)
@@ -202,7 +202,6 @@ for (k in 1:length(beta)){
     
     
   
-    
     j<-j+1
   }
   
@@ -240,8 +239,6 @@ ggplot(plot_data, aes(x = factor(true.beta), y = N, fill = model)) +
        x = expression(log(beta)), y = "Population Estimate (N)") +
   theme_minimal() +
   theme(legend.position = "bottom")
-
-
 
 
 
